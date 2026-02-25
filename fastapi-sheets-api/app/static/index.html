@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SheetSync — Data Manager</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surface2: #1a1a24;
+    --border: #2a2a3a;
+    --accent: #7fff6e;
+    --accent2: #3de8c8;
+    --accent3: #ff6b6b;
+    --text: #e8e8f0;
+    --muted: #6b6b80;
+    --radius: 12px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(127,255,110,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(127,255,110,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Glow orb */
+  body::after {
+    content: '';
+    position: fixed;
+    top: -200px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(127,255,110,0.06) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .app {
+    position: relative;
+    z-index: 1;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
+
+  /* HEADER */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 56px;
+    animation: fadeDown 0.6s ease both;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .logo-mark {
+    width: 40px;
+    height: 40px;
+    border: 2px solid var(--accent);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 18px;
+    color: var(--accent);
+    box-shadow: 0 0 20px rgba(127,255,110,0.2);
+  }
+
+  .logo-text {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 22px;
+    letter-spacing: -0.5px;
+  }
+
+  .logo-text span { color: var(--accent); }
+
+  .status-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--muted);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 8px 14px;
+    border-radius: 100px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .status-badge:hover { border-color: var(--accent); color: var(--accent); }
+
+  .status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: all 0.3s;
+  }
+
+  .status-dot.online { background: var(--accent); box-shadow: 0 0 8px var(--accent); animation: pulse 2s infinite; }
+  .status-dot.offline { background: var(--accent3); }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  /* BASE URL BAR */
+  .url-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 40px;
+    animation: fadeDown 0.6s 0.1s ease both;
+  }
+
+  .url-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+
+  .url-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--accent2);
+    font-family: 'DM Mono', monospace;
+    font-size: 14px;
+  }
+
+  /* TABS */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 4px;
+    border-radius: var(--radius);
+    margin-bottom: 32px;
+    animation: fadeDown 0.6s 0.15s ease both;
+  }
+
+  .tab {
+    flex: 1;
+    padding: 10px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .tab:hover { color: var(--text); }
+
+  .tab.active {
+    background: var(--surface2);
+    color: var(--accent);
+    border: 1px solid var(--border);
+  }
+
+  .tab-method {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 500;
+  }
+
+  .method-get { background: rgba(61,232,200,0.15); color: var(--accent2); }
+  .method-post { background: rgba(127,255,110,0.15); color: var(--accent); }
+  .method-put { background: rgba(255,165,0,0.15); color: orange; }
+  .method-delete { background: rgba(255,107,107,0.15); color: var(--accent3); }
+
+  /* PANELS */
+  .panel {
+    display: none;
+    animation: fadeUp 0.3s ease both;
+  }
+
+  .panel.active { display: block; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes fadeDown {
+    from { opacity: 0; transform: translateY(-12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .panel-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+
+  @media (max-width: 640px) { .panel-grid { grid-template-columns: 1fr; } }
+
+  /* CARDS */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+  }
+
+  .card-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* FORM ELEMENTS */
+  .field { margin-bottom: 16px; }
+
+  .field label {
+    display: block;
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+  }
+
+  .field input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .field input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(127,255,110,0.08);
+  }
+
+  .field input::placeholder { color: var(--muted); }
+
+  /* BUTTONS */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: none;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: 500;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #0a0a0f;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .btn-primary:hover { background: #9aff8b; box-shadow: 0 0 20px rgba(127,255,110,0.3); }
+
+  .btn-danger {
+    background: transparent;
+    color: var(--accent3);
+    border: 1px solid rgba(255,107,107,0.3);
+    width: 100%;
+    justify-content: center;
+  }
+
+  .btn-danger:hover { background: rgba(255,107,107,0.1); border-color: var(--accent3); }
+
+  .btn-secondary {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    width: 100%;
+    justify-content: center;
+  }
+
+  .btn-secondary:hover { border-color: var(--accent2); color: var(--accent2); }
+
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* RESPONSE BOX */
+  .response-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    font-size: 12px;
+    color: var(--muted);
+    min-height: 120px;
+    overflow-y: auto;
+    max-height: 280px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    transition: border-color 0.3s;
+  }
+
+  .response-box.success { border-color: rgba(127,255,110,0.3); color: var(--accent); }
+  .response-box.error { border-color: rgba(255,107,107,0.3); color: var(--accent3); }
+
+  /* TABLE */
+  .table-wrapper {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  .table-header {
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .table-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    text-transform: uppercase;
+    color: var(--muted);
+    letter-spacing: 0.5px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  thead th {
+    padding: 12px 24px;
+    text-align: left;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+  }
+
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--surface2); }
+
+  tbody td {
+    padding: 14px 24px;
+    color: var(--text);
+  }
+
+  .row-num {
+    color: var(--muted);
+    font-size: 11px;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 60px 24px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .empty-state .empty-icon {
+    font-size: 36px;
+    margin-bottom: 12px;
+    display: block;
+    opacity: 0.4;
+  }
+
+  /* LOADER */
+  .spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(127,255,110,0.3);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* TOAST */
+  .toast-container {
+    position: fixed;
+    bottom: 32px;
+    right: 32px;
+    z-index: 999;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .toast {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 260px;
+    animation: slideIn 0.3s ease both;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  }
+
+  .toast.success { border-color: rgba(127,255,110,0.4); }
+  .toast.error { border-color: rgba(255,107,107,0.4); }
+
+  .toast-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .toast.success .toast-dot { background: var(--accent); }
+  .toast.error .toast-dot { background: var(--accent3); }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(20px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  /* SECTION LABEL */
+  .section-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <div class="logo">
+      <div class="logo-mark">S</div>
+      <div class="logo-text">Sheet<span>Sync</span></div>
+    </div>
+    <button class="status-badge" onclick="checkHealth()">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusText">Check Status</span>
+    </button>
+  </header>
+
+  <div class="url-bar">
+    <span class="url-label">API</span>
+    <input class="url-input" type="text" id="baseUrl" value="http://127.0.0.1:8000" placeholder="http://127.0.0.1:8000" />
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('view')">
+      <span class="tab-method method-get">GET</span> View Data
+    </button>
+    <button class="tab" onclick="switchTab('add')">
+      <span class="tab-method method-post">POST</span> Add Record
+    </button>
+    <button class="tab" onclick="switchTab('update')">
+      <span class="tab-method method-put">PUT</span> Update Row
+    </button>
+    <button class="tab" onclick="switchTab('delete')">
+      <span class="tab-method method-delete">DEL</span> Delete Row
+    </button>
+  </div>
+
+  <!-- VIEW TAB -->
+  <div class="panel active" id="panel-view">
+    <div class="section-label">All Records</div>
+    <div class="table-wrapper">
+      <div class="table-header">
+        <span class="table-title">Spreadsheet Data</span>
+        <button class="btn btn-secondary" style="width:auto;" onclick="fetchData()">
+          <span id="fetchSpinner"></span> Refresh
+        </button>
+      </div>
+      <div id="tableContainer">
+        <div class="empty-state">
+          <span class="empty-icon">⬡</span>
+          Click Refresh to load data from Google Sheets
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADD TAB -->
+  <div class="panel" id="panel-add">
+    <div class="panel-grid">
+      <div class="card">
+        <div class="card-title">📝 New Record</div>
+        <div class="field">
+          <label>Name</label>
+          <input type="text" id="addName" placeholder="John Doe" />
+        </div>
+        <div class="field">
+          <label>Email</label>
+          <input type="email" id="addEmail" placeholder="john@example.com" />
+        </div>
+        <div class="field">
+          <label>Age</label>
+          <input type="number" id="addAge" placeholder="25" min="1" />
+        </div>
+        <button class="btn btn-primary" onclick="addRecord()">
+          <span id="addSpinner"></span> Append Row
+        </button>
+      </div>
+      <div class="card">
+        <div class="card-title">↩ Response</div>
+        <div class="response-box" id="addResponse">Waiting for request...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- UPDATE TAB -->
+  <div class="panel" id="panel-update">
+    <div class="panel-grid">
+      <div class="card">
+        <div class="card-title">✏️ Update Row</div>
+        <div class="field">
+          <label>Row Number</label>
+          <input type="number" id="updateRow" placeholder="2" min="2" />
+        </div>
+        <div class="field">
+          <label>Name</label>
+          <input type="text" id="updateName" placeholder="Updated Name" />
+        </div>
+        <div class="field">
+          <label>Email</label>
+          <input type="email" id="updateEmail" placeholder="updated@example.com" />
+        </div>
+        <div class="field">
+          <label>Age</label>
+          <input type="number" id="updateAge" placeholder="30" min="1" />
+        </div>
+        <button class="btn btn-secondary" onclick="updateRecord()">
+          <span id="updateSpinner"></span> Overwrite Row
+        </button>
+      </div>
+      <div class="card">
+        <div class="card-title">↩ Response</div>
+        <div class="response-box" id="updateResponse">Waiting for request...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DELETE TAB -->
+  <div class="panel" id="panel-delete">
+    <div class="panel-grid">
+      <div class="card">
+        <div class="card-title">🗑 Clear Row</div>
+        <div class="field">
+          <label>Row Number</label>
+          <input type="number" id="deleteRow" placeholder="2" min="2" />
+        </div>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:20px;line-height:1.6;">
+          This will clear the content of the specified row without shifting rows up.
+        </p>
+        <button class="btn btn-danger" onclick="deleteRecord()">
+          <span id="deleteSpinner"></span> Clear Row
+        </button>
+      </div>
+      <div class="card">
+        <div class="card-title">↩ Response</div>
+        <div class="response-box" id="deleteResponse">Waiting for request...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+  const BASE = () => document.getElementById('baseUrl').value.replace(/\/$/, '');
+
+  function switchTab(name) {
+    document.querySelectorAll('.tab').forEach((t,i) => t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    const tabs = document.querySelectorAll('.tab');
+    const idx = ['view','add','update','delete'].indexOf(name);
+    tabs[idx].classList.add('active');
+    document.getElementById('panel-' + name).classList.add('active');
+  }
+
+  function showToast(msg, type = 'success') {
+    const c = document.getElementById('toastContainer');
+    const t = document.createElement('div');
+    t.className = `toast ${type}`;
+    t.innerHTML = `<div class="toast-dot"></div><span>${msg}</span>`;
+    c.appendChild(t);
+    setTimeout(() => t.remove(), 3500);
+  }
+
+  function setResponse(id, data, isError = false) {
+    const box = document.getElementById(id);
+    box.textContent = JSON.stringify(data, null, 2);
+    box.className = 'response-box ' + (isError ? 'error' : 'success');
+  }
+
+  function setSpinner(id, on) {
+    const el = document.getElementById(id);
+    el.innerHTML = on ? '<span class="spinner"></span>' : '';
+  }
+
+  async function apiFetch(path, options = {}) {
+    const res = await fetch(BASE() + path, {
+      headers: { 'Content-Type': 'application/json' },
+      ...options
+    });
+    const json = await res.json();
+    return { ok: res.ok, data: json };
+  }
+
+  // HEALTH CHECK
+  async function checkHealth() {
+    const dot = document.getElementById('statusDot');
+    const txt = document.getElementById('statusText');
+    dot.className = 'status-dot';
+    txt.textContent = 'Checking...';
+    try {
+      const { ok, data } = await apiFetch('/api/v1/health');
+      if (ok) {
+        dot.className = 'status-dot online';
+        txt.textContent = 'Online';
+        showToast('API is healthy', 'success');
+      } else throw new Error();
+    } catch {
+      dot.className = 'status-dot offline';
+      txt.textContent = 'Offline';
+      showToast('Cannot reach API', 'error');
+    }
+  }
+
+  // FETCH DATA
+  async function fetchData() {
+    setSpinner('fetchSpinner', true);
+    try {
+      const { ok, data } = await apiFetch('/api/v1/data');
+      setSpinner('fetchSpinner', false);
+      if (!ok) { showToast('Failed to fetch data', 'error'); return; }
+
+      const rows = data.data || [];
+      const container = document.getElementById('tableContainer');
+
+      if (rows.length === 0) {
+        container.innerHTML = `<div class="empty-state"><span class="empty-icon">⬡</span>No records found in the spreadsheet.</div>`;
+        return;
+      }
+
+      let html = `<table><thead><tr>
+        <th>Row</th><th>Name</th><th>Email</th><th>Age</th>
+      </tr></thead><tbody>`;
+
+      rows.forEach(r => {
+        html += `<tr>
+          <td class="row-num">#${r.row_number}</td>
+          <td>${esc(r.name)}</td>
+          <td>${esc(r.email)}</td>
+          <td>${esc(String(r.age))}</td>
+        </tr>`;
+      });
+
+      html += `</tbody></table>`;
+      container.innerHTML = html;
+      showToast(`Loaded ${rows.length} record${rows.length !== 1 ? 's' : ''}`, 'success');
+    } catch (e) {
+      setSpinner('fetchSpinner', false);
+      showToast('Network error', 'error');
+    }
+  }
+
+  // ADD RECORD
+  async function addRecord() {
+    const name = document.getElementById('addName').value.trim();
+    const email = document.getElementById('addEmail').value.trim();
+    const age = parseInt(document.getElementById('addAge').value);
+
+    if (!name || !email || !age) { showToast('Fill all fields', 'error'); return; }
+
+    setSpinner('addSpinner', true);
+    try {
+      const { ok, data } = await apiFetch('/api/v1/data', {
+        method: 'POST',
+        body: JSON.stringify({ name, email, age })
+      });
+      setSpinner('addSpinner', false);
+      setResponse('addResponse', data, !ok);
+      if (ok) {
+        showToast('Record appended', 'success');
+        document.getElementById('addName').value = '';
+        document.getElementById('addEmail').value = '';
+        document.getElementById('addAge').value = '';
+      } else showToast('Request failed', 'error');
+    } catch (e) {
+      setSpinner('addSpinner', false);
+      setResponse('addResponse', { error: 'Network error' }, true);
+      showToast('Network error', 'error');
+    }
+  }
+
+  // UPDATE RECORD
+  async function updateRecord() {
+    const row = parseInt(document.getElementById('updateRow').value);
+    const name = document.getElementById('updateName').value.trim();
+    const email = document.getElementById('updateEmail').value.trim();
+    const age = parseInt(document.getElementById('updateAge').value);
+
+    if (!row || !name || !email || !age) { showToast('Fill all fields', 'error'); return; }
+
+    setSpinner('updateSpinner', true);
+    try {
+      const { ok, data } = await apiFetch(`/api/v1/data/${row}`, {
+        method: 'PUT',
+        body: JSON.stringify({ name, email, age })
+      });
+      setSpinner('updateSpinner', false);
+      setResponse('updateResponse', data, !ok);
+      showToast(ok ? `Row ${row} updated` : 'Request failed', ok ? 'success' : 'error');
+    } catch (e) {
+      setSpinner('updateSpinner', false);
+      setResponse('updateResponse', { error: 'Network error' }, true);
+      showToast('Network error', 'error');
+    }
+  }
+
+  // DELETE RECORD
+  async function deleteRecord() {
+    const row = parseInt(document.getElementById('deleteRow').value);
+    if (!row) { showToast('Enter a row number', 'error'); return; }
+
+    setSpinner('deleteSpinner', true);
+    try {
+      const { ok, data } = await apiFetch(`/api/v1/data/${row}`, { method: 'DELETE' });
+      setSpinner('deleteSpinner', false);
+      setResponse('deleteResponse', data, !ok);
+      showToast(ok ? `Row ${row} cleared` : 'Request failed', ok ? 'success' : 'error');
+    } catch (e) {
+      setSpinner('deleteSpinner', false);
+      setResponse('deleteResponse', { error: 'Network error' }, true);
+      showToast('Network error', 'error');
+    }
+  }
+
+  function esc(str) {
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  // Auto-check health on load
+  window.addEventListener('load', () => setTimeout(checkHealth, 500));
+</script>
+</body>
+</html>
